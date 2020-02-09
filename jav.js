@@ -15,7 +15,7 @@ const _ = require('lodash');
 // global var
 
 const VERSION = require('./package.json').version;
-const baseUrl = 'https://www.javbus2.pw';
+const baseUrl = 'https://www.buscdn.life/';
 const searchUrl = '/search';
 var pageIndex = 1;
 var currentPageHtml = null;
@@ -32,6 +32,7 @@ program
     .option('-x, --proxy <url>', '使用代理服务器, 例：-x http://127.0.0.1:8087')
     .option('-n, --nomag', '是否抓取尚无磁链的影片')
     .option('-a, --allmag', '是否抓取影片的所有磁链(默认只抓取文件体积最大的磁链)')
+    .option('-N, --nopic', '不抓取图片')
     .parse(process.argv);
 
 
@@ -232,9 +233,9 @@ function getItemPage(link, index, callback) {
                 let script = $('script', 'body').eq(2).html();
                 let meta = parse(script);
 
+                meta.category = [];
                 $('div.col-md-3 > p').each(function (i, e) {
                     let text = $(e).text();
-                    meta.category = [];
                     if (text.includes('發行日期:')) {
                         meta.date = text.replace('發行日期: ', '');
                     } else if (text.includes('系列:')) {
@@ -261,14 +262,16 @@ function getItemPage(link, index, callback) {
 
                 getItemMagnet(link, meta, callback);
 
-                // 所有截图link
-                var snapshots = [];
-                $('a.sample-box').each(function (i, e) {
-                    let $e = $(e);
+                if (!program.nopic) {
+                    // 所有截图link
+                    var snapshots = [];
+                    $('a.sample-box').each(function (i, e) {
+                        let $e = $(e);
 
-                    snapshots.push($e.attr('href'));
-                });
-                getSnapshots(link, snapshots);
+                        snapshots.push($e.attr('href'));
+                    });
+                    getSnapshots(link, snapshots);
+                }
             });
     }
 }
@@ -358,7 +361,7 @@ function getItemMagnet(link, meta, done) {
                             return done(null); // one magnet fetch fail, do not crash the whole task.
                         }
                         const $ = cheerio.load(body);
-                        if ($('tr').eq(0).children('td').eq(1).children('a').text()) {
+                        if ($('tr').eq(-1).children('td').eq(1).children('a').text()) {
                             let mag_sizes = $('tr').map(function readMagnetAndSize(i, e) {
                                 let anchorInSecondTableCell = $(e).children('td').eq(1).children('a');
                                 return {
@@ -387,13 +390,16 @@ function getItemMagnet(link, meta, done) {
                                     throw err;
                                 }
                                 console.log(('[' + fanhao + ']').green.bold.inverse + '[信息]'.yellow.inverse + '影片信息已抓取');
-                                getItemCover(link, meta, done);
+                                if (!program.nopic) {
+                                    getItemCover(link, meta, done);
+                                } else { return done(); }
                             });
 
                     });
         } else {
             console.log(('[' + fanhao + ']').green.bold.inverse + '[信息]'.yellow.inverse, 'file already exists, skip!'.yellow);
-            getItemCover(link, meta, done);
+            if (!program.nopic) getItemCover(link, meta, done);
+            else return done();
         }
     });
 }
